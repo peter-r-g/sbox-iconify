@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sandbox.UI;
 
@@ -7,6 +9,7 @@ public class IconifyPanel : Panel
 {
 	public static readonly BaseFileSystem DefaultCache;
 
+	private CancellationTokenSource _textureFetchTokenSource = new();
 	private Texture _svgTexture;
 
 	private bool _dirty = false;
@@ -56,7 +59,7 @@ public class IconifyPanel : Panel
 
 	protected override void OnAfterTreeRender( bool firstTime )
 	{
-		SetIcon();
+		_ = SetIcon();
 	}
 
 	public override void OnLayout( ref Rect layoutRect )
@@ -82,21 +85,24 @@ public class IconifyPanel : Panel
 		Graphics.DrawQuad( Box.Rect, Material.UI.Basic, Color.White );
 	}
 
-	private void SetIcon()
+	private async Task SetIcon()
 	{
 		if ( !_dirty )
 			return;
 
+		_textureFetchTokenSource.Cancel();
+		_textureFetchTokenSource = new CancellationTokenSource();
 		_dirty = false;
 		_svgTexture = Texture.White;
 
 		var icon = new IconifyIcon( _icon );
 		var rect = Box.Rect;
 		var tintColor = ComputedStyle?.FontColor;
-		
-		icon.LoadTextureAsync( rect, tintColor ).ContinueWith( ( task ) =>
+
+		try
 		{
-			_svgTexture = task.Result;
-		} );
+			_svgTexture = await icon.LoadTextureAsync( rect, tintColor, _textureFetchTokenSource.Token );
+		}
+		catch ( OperationCanceledException ) { }
 	}
 }

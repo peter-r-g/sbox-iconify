@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -43,19 +44,26 @@ public struct IconifyIcon
 		}
 	}
 
-	public async Task<Texture> LoadTextureAsync( Rect rect, Color? tintColor )
+	public async Task<Texture> LoadTextureAsync( Rect rect, Color? tintColor, CancellationToken cancellationToken = default )
 	{
 		var fs = IconifyOptions.Current.CacheFileSystem;
+		// NOTE: Not passing the cancellation token here so that the icon can still be cached for later.
 		await EnsureIconDataIsCachedAsync( fs );
+		cancellationToken.ThrowIfCancellationRequested();
 
 		// HACK: Check whether this icon is tintable based on whether it references CSS currentColor
 		var imageData = await fs.ReadAllTextAsync( LocalPath );
+		cancellationToken.ThrowIfCancellationRequested();
+
 		IsTintable = imageData.Contains( "currentColor" );
 
 		var pathParams = BuildPathParams( rect, tintColor );
 		var path = LocalPath + pathParams;
-    
-		return Texture.Load( fs, path );
+
+		var texture = await Texture.LoadAsync( fs, path );
+		cancellationToken.ThrowIfCancellationRequested();
+
+		return texture;
 	}
 
 	private string BuildPathParams( Rect rect, Color? tintColor )
