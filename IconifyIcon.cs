@@ -41,8 +41,15 @@ public struct IconifyIcon
 		if ( fs.FileExists( LocalPath ) )
 			return;
 
-		while ( _fetchingImages.Contains( LocalPath ) )
-			await GameTask.Delay( 1 );
+		if ( _fetchingImages.Contains( LocalPath ) )
+		{
+			do
+			{
+				await GameTask.Delay( 1 );
+			} while ( _fetchingImages.Contains( LocalPath ) );
+
+			return;
+		}
 
 		try
 		{
