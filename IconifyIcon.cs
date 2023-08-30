@@ -1,4 +1,5 @@
 ﻿using Iconify;
+using Iconify.Util;
 using System;
 using System.IO;
 using System.Net;
@@ -20,6 +21,8 @@ public struct IconifyIcon
 	private readonly string Url => $"https://api.iconify.design/{Prefix}/{Name}.svg?{WidthParam}";
 	private readonly string LocalPath => $"{Prefix}/{Name}.svg";
 
+	private static readonly ConcurrentHashSet<string> _fetchingImages = new();
+
 	private async Task<string> FetchImageDataAsync()
 	{
 		var response = await Http.RequestAsync( Url, "GET" );
@@ -34,13 +37,25 @@ public struct IconifyIcon
 
 	public async Task EnsureIconDataIsCachedAsync( BaseFileSystem fs )
 	{
-		if ( !fs.FileExists( LocalPath ) )
+		if ( fs.FileExists( LocalPath ) )
+			return;
+
+		while ( _fetchingImages.Contains( LocalPath ) )
+			await GameTask.Delay( 1 );
+
+		try
 		{
+			_fetchingImages.Add( LocalPath );
+
 			var directory = Path.GetDirectoryName( LocalPath );
 			fs.CreateDirectory( directory );
 
 			var iconContents = await FetchImageDataAsync();
 			fs.WriteAllText( LocalPath, iconContents );
+		}
+		finally
+		{
+			_fetchingImages.Remove( LocalPath );
 		}
 	}
 
