@@ -7,8 +7,6 @@ namespace Sandbox.UI;
 [Alias( "iconify", "iconify-icon" )]
 public class IconifyPanel : Panel
 {
-	public static readonly BaseFileSystem DefaultCache;
-
 	private CancellationTokenSource _textureFetchTokenSource = new();
 	private Texture _svgTexture;
 
@@ -26,15 +24,6 @@ public class IconifyPanel : Panel
 			_icon = value;
 			_dirty = true;
 		}
-	}
-
-	static IconifyPanel()
-	{
-		if ( FileSystem.Data is null )
-			return;
-
-		FileSystem.Data.CreateDirectory( "iconify" );
-		DefaultCache = FileSystem.Data.CreateSubSystem( "iconify" );
 	}
 
 	public IconifyPanel()
