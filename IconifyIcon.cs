@@ -15,11 +15,12 @@ public struct IconifyIcon
 	public string Prefix { get; private set; }
 	public string Name { get; private set; }
 
-	public bool IsTintable { get; private set; }
+	public readonly bool IsTintable => IconifyOptions.Current.CacheFileSystem.FileExists( LocalTintablePath );
 
-  private readonly string WidthParam => HttpUtility.UrlEncode( "width=100%" );
+	private readonly string WidthParam => HttpUtility.UrlEncode( "width=100%" );
 	private readonly string Url => $"https://api.iconify.design/{Prefix}/{Name}.svg?{WidthParam}";
 	private readonly string LocalPath => $"{Prefix}/{Name}.svg";
+	private readonly string LocalTintablePath => $"{Prefix}/{Name}.t.svg";
 
 	private static readonly ConcurrentHashSet<string> _fetchingImages = new();
 
@@ -51,7 +52,9 @@ public struct IconifyIcon
 			fs.CreateDirectory( directory );
 
 			var iconContents = await FetchImageDataAsync();
-			fs.WriteAllText( LocalPath, iconContents );
+			// HACK: Check whether this icon is tintable based on whether it references CSS currentColor
+			var isTintable = iconContents.Contains( "currentColor" );
+			fs.WriteAllText( isTintable ? LocalTintablePath : LocalPath, iconContents );
 		}
 		finally
 		{
@@ -66,14 +69,8 @@ public struct IconifyIcon
 		await EnsureIconDataIsCachedAsync( fs );
 		cancellationToken.ThrowIfCancellationRequested();
 
-		// HACK: Check whether this icon is tintable based on whether it references CSS currentColor
-		var imageData = await fs.ReadAllTextAsync( LocalPath );
-		cancellationToken.ThrowIfCancellationRequested();
-
-		IsTintable = imageData.Contains( "currentColor" );
-
 		var pathParams = BuildPathParams( rect, tintColor );
-		var path = LocalPath + pathParams;
+		var path = (IsTintable ? LocalTintablePath : LocalPath) + pathParams;
 
 		var texture = await Texture.LoadAsync( fs, path );
 		cancellationToken.ThrowIfCancellationRequested();
